@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Dự đoán bệnh tim - Gom model</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .badge-healthy { background-color: #2ecc71; }
+        .badge-disease { background-color: #e74c3c; }
+    </style>
+</head>
+<body class="bg-light">
+<div class="container py-5">
+    <h2 class="text-center mb-4">DỰ ĐOÁN BỆNH TIM (GOM MODEL)</h2>
+    <form id="predictForm" class="row g-3">
+        <div class="col-md-4"><label class="form-label">Tuổi</label><input name="age" type="number" class="form-control" required></div>
+        <div class="col-md-4"><label class="form-label">Giới tính</label><select name="sex" class="form-select"><option value="1">Nam</option><option value="0">Nữ</option></select></div>
+        <div class="col-md-4"><label class="form-label">Đau ngực (cp)</label><select name="cp" class="form-select"><option value="0">Không</option><option value="1">Điển hình</option><option value="2">Không điển hình</option><option value="3">Không đau</option></select></div>
+        <div class="col-md-4"><label class="form-label">Huyết áp</label><input name="trestbps" type="number" class="form-control" required></div>
+        <div class="col-md-4"><label class="form-label">Cholesterol</label><input name="chol" type="number" class="form-control" required></div>
+        <div class="col-md-4"><label class="form-label">Đường huyết cao?</label><select name="fbs" class="form-select"><option value="0">Không</option><option value="1">Có</option></select></div>
+        <div class="col-md-4"><label class="form-label">Điện tâm đồ</label><select name="restecg" class="form-select"><option value="0">Bình thường</option><option value="1">ST-T</option><option value="2">Phì đại</option></select></div>
+        <div class="col-md-4"><label class="form-label">Nhịp tim tối đa</label><input name="thalach" type="number" class="form-control" required></div>
+        <div class="col-md-4"><label class="form-label">Đau ngực khi tập?</label><select name="exang" class="form-select"><option value="0">Không</option><option value="1">Có</option></select></div>
+        <div class="col-md-4"><label class="form-label">Oldpeak</label><input name="oldpeak" type="number" step="0.1" class="form-control" required></div>
+        <div class="col-md-4"><label class="form-label">Slope</label><select name="slope" class="form-select"><option value="0">Lên</option><option value="1">Ngang</option><option value="2">Xuống</option></select></div>
+        <div class="col-md-4"><label class="form-label">Số mạch máu (ca)</label><select name="ca" class="form-select"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></div>
+        <div class="col-md-4"><label class="form-label">Thalassemia</label><select name="thal" class="form-select"><option value="1">Bình thường</option><option value="2">Lỗi cố định</option><option value="3">Lỗi đảo ngược</option></select></div>
+        <div class="col-12 text-center mt-4"><button type="submit" class="btn btn-primary btn-lg">Dự đoán</button></div>
+    </form>
+
+    <div id="resultSection" class="mt-5 text-center" style="display:none;">
+        <h4>KẾT QUẢ</h4>
+        <p>Random Forest: <span id="rfResult" class="badge"></span> - <span id="rfTime"></span> ms</p>
+        <p>XGBoost: <span id="xgbResult" class="badge"></span> - <span id="xgbTime"></span> ms</p>
+        <p>SVM: <span id="svmResult" class="badge"></span> - <span id="svmTime"></span> ms</p>
+        <h5 class="mt-4">Tổng hợp: <span id="finalResult" class="badge fs-5"></span></h5>
+        <p>Tổng thời gian: <span id="totalTime"></span> ms</p>
+    </div>
+</div>
+<script>
+document.getElementById("predictForm").addEventListener("submit", async function(e) {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(e.target).entries());
+    for (let key in data) data[key] = parseFloat(data[key]);
+    const res = await fetch("/ensemble_predict", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+    });
+    
+    // Reset kết quả cũ
+    document.getElementById("rfResult").innerHTML = "-";
+    document.getElementById("xgbResult").innerHTML = "-";
+    document.getElementById("svmResult").innerHTML = "-";
+    document.getElementById("finalResult").innerHTML = "-";
+    document.getElementById("rfTime").textContent = "-";
+    document.getElementById("xgbTime").textContent = "-";
+    document.getElementById("svmTime").textContent = "-";
+    document.getElementById("totalTime").textContent = "-";
+    document.getElementById("resultSection").style.display = "none";
+
+    const result = await res.json();
+    
+    if (result.status !== "success") return alert("Lỗi: " + result.message);
+
+    const badge = (val) => val ? "<span class='badge badge-disease'>BỆNH</span>" : "<span class='badge badge-healthy'>KHỎE</span>";
+    document.getElementById("rfResult").innerHTML = badge(result.predictions.random_forest);
+    document.getElementById("xgbResult").innerHTML = badge(result.predictions.xgb);
+    document.getElementById("svmResult").innerHTML = badge(result.predictions.svm);
+    document.getElementById("finalResult").innerHTML = badge(result.predictions.final);
+    document.getElementById("rfTime").textContent = result.processing_time.random_forest;
+    document.getElementById("xgbTime").textContent = result.processing_time.xgb;
+    document.getElementById("svmTime").textContent = result.processing_time.svm;
+    document.getElementById("totalTime").textContent = result.processing_time.total;
+    document.getElementById("resultSection").style.display = "block";
+});
+</script>
+</body>
+</html>
